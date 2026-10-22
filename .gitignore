@@ -1,0 +1,22 @@
+# Dependências
+node_modules/
+
+# Build e cobertura
+dist/
+coverage/
+*.tsbuildinfo
+
+# Segredos: nunca versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+firebase-adminsdk*.json
+clover-tokens*.json
+
+# Local
+*.log
+.DS_Store
+.vscode/
+.idea/

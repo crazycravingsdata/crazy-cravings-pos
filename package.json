@@ -1,0 +1,14 @@
+{
+  "name": "crazy-cravings-pos",
+  "private": true,
+  "version": "0.0.0",
+  "description": "POS offline-first para as vans e feiras da Crazy Cravings",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  }
+}
