@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Shift } from '../../db/schema';
 import { CloseShiftDialog } from '../shift/CloseShiftDialog';
+import type { SyncStatus } from '../../sync/useSync';
 import { SyncBadge } from '../../ui/SyncBadge';
 import { CartPanel } from './CartPanel';
 import { CatalogGrid } from './CatalogGrid';
@@ -12,10 +13,11 @@ type Dialog = 'none' | 'pay' | 'discount' | 'close';
 
 type Props = {
   shift: Shift;
+  syncStatus: SyncStatus;
   onShiftClosed: (closed: Shift) => void;
 };
 
-export function SaleScreen({ shift, onShiftClosed }: Props) {
+export function SaleScreen({ shift, syncStatus, onShiftClosed }: Props) {
   const cart = useCart();
   const [dialog, setDialog] = useState<Dialog>('none');
 
@@ -30,7 +32,7 @@ export function SaleScreen({ shift, onShiftClosed }: Props) {
           </span>
         </div>
         <div className="topbar-right">
-          <SyncBadge />
+          <SyncBadge status={syncStatus} />
           <button className="btn" onClick={() => setDialog('close')}>
             Close shift
           </button>

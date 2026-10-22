@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { createConfiguredSender } from '../firebase';
 import { db } from '../state/db';
 import { flushOutbox, type EventSender } from './outbox';
 
@@ -10,22 +9,23 @@ export type SyncStatus =
   | { kind: 'pending'; pending: number }
   | { kind: 'synced' };
 
+export type SyncEngine = {
+  status: SyncStatus;
+  /** Eventos ainda não enviados, em qualquer estado de conexão. */
+  pending: number;
+};
+
 const FLUSH_INTERVAL_MS = 30_000;
 
-export function useSync(): SyncStatus {
+/**
+ * Motor de sincronização. Deve rodar no nível do app (não dentro de uma tela),
+ * para continuar enviando, por exemplo, o evento de fechamento depois que a
+ * tela de venda sai de cena. `sender` indefinido = sincronização desligada
+ * (modo local, ou conta ainda não logada).
+ */
+export function useSyncEngine(sender: EventSender | undefined): SyncEngine {
   const pending = useLiveQuery(() => db.outbox.where('status').equals('pending').count(), [], 0);
   const [online, setOnline] = useState(() => navigator.onLine);
-  const [sender, setSender] = useState<EventSender | undefined>();
-
-  useEffect(() => {
-    let cancelled = false;
-    void createConfiguredSender().then((s) => {
-      if (!cancelled) setSender(() => s);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -55,8 +55,11 @@ export function useSync(): SyncStatus {
     return () => clearInterval(timer);
   }, [sender, online, pending]);
 
-  if (!sender) return { kind: 'disabled' };
-  if (!online) return { kind: 'offline', pending };
-  if (pending > 0) return { kind: 'pending', pending };
-  return { kind: 'synced' };
+  let status: SyncStatus;
+  if (!sender) status = { kind: 'disabled' };
+  else if (!online) status = { kind: 'offline', pending };
+  else if (pending > 0) status = { kind: 'pending', pending };
+  else status = { kind: 'synced' };
+
+  return { status, pending };
 }

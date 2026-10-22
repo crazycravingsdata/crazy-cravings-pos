@@ -1,9 +1,7 @@
-import { useSync } from '../sync/useSync';
+import type { SyncStatus } from '../sync/useSync';
 import { Icon, type IconName } from './Icon';
 
-export function SyncBadge() {
-  const status = useSync();
-
+export function SyncBadge({ status }: { status: SyncStatus }) {
   let icon: IconName = 'cloud';
   let text = 'Synced';
   let tone = 'ok';

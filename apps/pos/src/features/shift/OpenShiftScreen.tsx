@@ -6,15 +6,26 @@ import { db } from '../../state/db';
 import { VAN_IDS, saveIdentity } from '../../state/session';
 import { openShift } from './shift';
 
+/** Conta logada: a van vem do login e não pode ser trocada. */
+export type Account = {
+  email: string;
+  vanId: string;
+  canSignOut: boolean;
+  onSignOut: () => void;
+};
+
 type Props = {
   initialVanId: string | undefined;
   initialOperator: string | undefined;
   lastClosed: Shift | undefined;
+  account?: Account;
 };
 
-export function OpenShiftScreen({ initialVanId, initialOperator, lastClosed }: Props) {
-  const [vanId, setVanId] = useState(initialVanId ?? VAN_IDS[0]);
-  const [operator, setOperator] = useState(initialOperator ?? '');
+export function OpenShiftScreen({ initialVanId, initialOperator, lastClosed, account }: Props) {
+  const [vanId, setVanId] = useState(account?.vanId ?? initialVanId ?? VAN_IDS[0]);
+  const [operator, setOperator] = useState(
+    initialOperator ?? (account ? (account.email.split('@')[0] ?? '') : ''),
+  );
   const [floatText, setFloatText] = useState('100');
   const [eventName, setEventName] = useState('');
   const [error, setError] = useState<string | undefined>();
@@ -49,6 +60,8 @@ export function OpenShiftScreen({ initialVanId, initialOperator, lastClosed }: P
       <form className="card form" onSubmit={onSubmit}>
         <h1>Open shift</h1>
 
+        {account && <p className="muted">Signed in as {account.email}</p>}
+
         {lastClosed && (
           <div className="notice" role="status">
             <strong>Last shift closed.</strong>{' '}
@@ -63,8 +76,12 @@ export function OpenShiftScreen({ initialVanId, initialOperator, lastClosed }: P
 
         <label>
           Van
-          <select value={vanId} onChange={(e) => setVanId(e.target.value)}>
-            {VAN_IDS.map((id) => (
+          <select
+            value={vanId}
+            onChange={(e) => setVanId(e.target.value)}
+            disabled={account !== undefined}
+          >
+            {(account ? [account.vanId] : VAN_IDS).map((id) => (
               <option key={id} value={id}>
                 {id}
               </option>
@@ -111,6 +128,20 @@ export function OpenShiftScreen({ initialVanId, initialOperator, lastClosed }: P
         <button className="btn primary big" type="submit" disabled={busy}>
           Open shift
         </button>
+
+        {account && (
+          <button
+            type="button"
+            className="btn"
+            onClick={account.onSignOut}
+            disabled={!account.canSignOut}
+          >
+            Sign out
+          </button>
+        )}
+        {account && !account.canSignOut && (
+          <p className="muted">Sign out is disabled until the pending sales are sent.</p>
+        )}
       </form>
     </main>
   );

@@ -9,6 +9,8 @@ export type Session = {
   operator: string | undefined;
   /** Turno aberto desta van, se houver. */
   shift: Shift | undefined;
+  /** Turno aberto neste tablet que pertence a OUTRA van (dinheiro em aberto de outra conta). */
+  foreignShift: Shift | undefined;
 };
 
 export async function saveIdentity(vanId: string, operator: string): Promise<void> {
@@ -18,19 +20,23 @@ export async function saveIdentity(vanId: string, operator: string): Promise<voi
   ]);
 }
 
-/** undefined enquanto carrega; objeto Session depois. */
-export function useSession(): Session | undefined {
+/**
+ * undefined enquanto carrega; objeto Session depois.
+ * `forcedVanId`: van definida pela conta logada. Quando presente, ela vale mais
+ * do que a van salva localmente, para o operador não poder escolher outra.
+ */
+export function useSession(forcedVanId: string | undefined): Session | undefined {
   return useLiveQuery(async () => {
     const [van, op] = await Promise.all([db.meta.get('vanId'), db.meta.get('operator')]);
-    const vanId = typeof van?.value === 'string' ? van.value : undefined;
+    const stored = typeof van?.value === 'string' ? van.value : undefined;
+    const vanId = forcedVanId ?? stored;
     const operator = typeof op?.value === 'string' ? op.value : undefined;
-    const shift = vanId
-      ? await db.shifts
-          .where('vanId')
-          .equals(vanId)
-          .filter((s) => s.closedAt === undefined)
-          .first()
-      : undefined;
-    return { vanId, operator, shift } satisfies Session;
-  }, []);
+
+    const openShifts = await db.shifts.filter((s) => s.closedAt === undefined).toArray();
+    const shift = vanId ? openShifts.find((s) => s.vanId === vanId) : undefined;
+    const foreignShift =
+      forcedVanId !== undefined ? openShifts.find((s) => s.vanId !== forcedVanId) : undefined;
+
+    return { vanId, operator, shift, foreignShift } satisfies Session;
+  }, [forcedVanId]);
 }

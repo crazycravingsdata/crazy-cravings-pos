@@ -1,0 +1,14 @@
+{
+  "name": "@crazy-cravings/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:rules": "npx -y firebase-tools@13 emulators:exec --only firestore --project demo-crazy-cravings \"vitest run\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.2",
+    "vitest": "^2.1.4"
+  }
+}

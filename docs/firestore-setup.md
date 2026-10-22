@@ -1,56 +1,91 @@
-# Firestore: configuração e isolamento por van
+# Firebase: login por operador e sincronização por van
 
-## Projetos
+## Como funciona
 
-Use dois projetos Firebase separados:
+- Cada operador tem uma conta (email e senha) no Firebase Auth.
+- A conta carrega dois "claims", definidos só por um administrador: `role` e `vanId`.
+- A van do operador vem do claim. No tablet, o campo de van fica travado.
+- O Firestore só aceita eventos da van que a conta representa (`infra/firestore.rules`).
+- O primeiro login num tablet precisa de internet. Depois, a sessão fica salva e o caixa
+  vende offline normalmente. Uma sessão salva continua valendo sem conexão.
+- Gerentes e admins NÃO operam o caixa: o app mostra "No access" para eles. Eles usam o
+  painel do escritório (a criar).
+- Sair da conta fica bloqueado enquanto houver vendas não enviadas, para elas não ficarem presas.
+- Se o tablet tiver um turno aberto de outra van, o app bloqueia e pede para fechar com a conta certa.
 
-- desenvolvimento (testes, emulador, dados falsos)
+## 1. Criar os projetos
+
+Dois projetos separados no console do Firebase (https://console.firebase.google.com):
+
+- desenvolvimento (testes, dados falsos)
 - produção (vendas reais)
 
 Nunca aponte o ambiente de desenvolvimento para o projeto de produção.
 
-## Modelo de acesso
+## 2. Ativar o login
 
-O acesso é decidido por custom claims no Firebase Auth, definidos só pelo Admin SDK:
+No projeto: Build, Authentication, Sign-in method, ativar **Email/Password**.
+Desative o cadastro aberto: crie as contas você mesmo (Authentication, Users, Add user).
 
-| Claim | Valores | Efeito |
-|---|---|---|
-| `role` | `operator`, `manager`, `admin` | Define o que a conta pode fazer |
-| `vanId` | ex. `van-01` | Obrigatório para `operator`; limita a conta aos dados da própria van |
+## 3. Criar o app web e copiar a configuração
 
-Regras (`infra/firestore.rules`):
+Project settings, Your apps, Web app. Copie `apiKey`, `authDomain`, `projectId` e `appId`
+para `apps/pos/.env.local` (este arquivo não vai para o Git):
 
-- Operador cria eventos só em `vans/{sua-van}/events/*`, com formato validado.
-- Reenvio de um evento já gravado só é aceito se o conteúdo for idêntico (idempotência).
-- Ninguém apaga eventos. Correção é um novo evento.
-- Gerentes leem todas as vans. Admin cadastra vans.
-- Todo o resto é negado.
-
-## Definir os claims (uma vez por conta, em máquina de confiança)
-
-```js
-// scripts/set-claims.mjs (rodar localmente com credenciais de serviço; NUNCA versionar a chave)
-import { initializeApp, applicationDefault } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-
-initializeApp({ credential: applicationDefault() });
-await getAuth().setCustomUserClaims('<UID_DO_TABLET>', { role: 'operator', vanId: 'van-01' });
+```
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_APP_ID=...
 ```
 
-O usuário precisa renovar o token (`getIdToken(true)`) para o claim valer.
+Esses valores identificam o projeto e podem ir no app. A proteção vem das regras do Firestore
+e do login, não de esconder a chave.
 
-## Testar as regras
+Em Authentication, Settings, Authorized domains, adicione o domínio onde o PDV for publicado.
+
+## 4. Criar o banco e publicar as regras
+
+Firestore Database, Create database (modo produção). Depois publique as regras:
 
 ```bash
 cd infra
-npx firebase emulators:start --only firestore,auth
+npx firebase-tools login
+npx firebase-tools deploy --only firestore:rules --project <id-do-projeto>
 ```
 
-Casos mínimos a testar no emulador antes de ir a produção:
+## 5. Definir role e van de cada conta
 
-1. Operador da `van-01` cria evento em `vans/van-01/events/x`: permitido.
-2. Mesmo operador em `vans/van-02/events/x`: negado.
-3. Reenvio idêntico: permitido. Reenvio com conteúdo alterado: negado.
-4. Delete: negado para todos.
-5. Operador sem claim `vanId`: negado.
-6. Gerente lê todas as vans: permitido.
+Baixe uma chave de conta de serviço (Project settings, Service accounts) e guarde FORA do repositório.
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=/caminho/fora/do/git/chave.json \
+  node scripts/set-claims.mjs --project <id> --email ana@exemplo.ca --role operator --van van-01
+
+GOOGLE_APPLICATION_CREDENTIALS=/caminho/fora/do/git/chave.json \
+  node scripts/set-claims.mjs --project <id> --email chefe@exemplo.ca --role manager
+```
+
+O comando SUBSTITUI todos os claims da conta. Peça para a pessoa sair e entrar de novo.
+
+## 6. Testar as regras no emulador
+
+Requer Java 11 ou superior e acesso à internet para baixar o emulador na primeira vez:
+
+```bash
+pnpm --filter @crazy-cravings/infra test:rules
+```
+
+São 20 casos: criação só na própria van, reenvio idêntico aceito, reenvio alterado recusado,
+exclusão sempre recusada, leitura isolada por van, catálogo e cadastro de vans.
+
+**Estado atual:** esses testes foram escritos mas ainda NÃO foram executados (o ambiente de
+desenvolvimento não conseguiu baixar o emulador). Rode-os antes de usar em produção.
+
+## Limitações conhecidas
+
+- As regras não impedem que um operador com uma conta válida grave um evento falso da própria
+  van. O que elas garantem é isolamento entre vans, formato válido e histórico imutável.
+  A conferência de valores é feita na conciliação com a Clover (Fase 2).
+- Contas de operador compartilhadas entre pessoas apagam a rastreabilidade. Prefira uma conta
+  por pessoa, todas com o `vanId` da van em que trabalham.
