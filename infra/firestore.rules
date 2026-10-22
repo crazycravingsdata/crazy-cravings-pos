@@ -1,0 +1,75 @@
+rules_version = '2';
+
+// Acesso por van e por perfil, via custom claims do Firebase Auth:
+//   role:  'operator' | 'manager' | 'admin'
+//   vanId: ex. 'van-01' (obrigatório para operator)
+// Os claims são definidos apenas pelo Admin SDK (ver docs/firestore-setup.md).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.get('role', '');
+    }
+
+    function isAdmin() {
+      return signedIn() && role() == 'admin';
+    }
+
+    function isManager() {
+      return signedIn() && role() in ['manager', 'admin'];
+    }
+
+    function isVanOperator(vanId) {
+      return signedIn()
+        && role() == 'operator'
+        && request.auth.token.get('vanId', '') == vanId;
+    }
+
+    function validEvent(vanId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['vanId', 'type', 'payload', 'createdAt'])
+        && d.keys().hasAll(['vanId', 'type', 'payload', 'createdAt'])
+        && d.vanId == vanId
+        && d.type in ['shift.opened', 'shift.closed', 'sale.created', 'cash.moved', 'inventory.moved']
+        && d.createdAt is number
+        && d.payload is map;
+    }
+
+    // Cadastro das vans: só admin escreve; a própria van e gerentes leem.
+    match /vans/{vanId} {
+      allow read: if isManager() || isVanOperator(vanId);
+      allow write: if isAdmin();
+
+      // Eventos de venda: log append-only, isolado por van.
+      match /events/{eventId} {
+        allow read: if isManager() || isVanOperator(vanId);
+
+        // Criação: só o operador da própria van, com formato válido.
+        allow create: if isVanOperator(vanId) && validEvent(vanId);
+
+        // Reenvio idempotente: aceita apenas se o conteúdo for idêntico ao já gravado.
+        allow update: if isVanOperator(vanId)
+          && validEvent(vanId)
+          && request.resource.data == resource.data;
+
+        // Nunca apagar eventos. Correções são novos eventos (contra-lançamento).
+        allow delete: if false;
+      }
+    }
+
+    // Catálogo compartilhado: todos os usuários autenticados leem, gerentes escrevem.
+    match /catalog/{document=**} {
+      allow read: if signedIn();
+      allow write: if isManager();
+    }
+
+    // Todo o resto é negado por padrão.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
