@@ -1,8 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import type { AuthService } from '../../auth/auth-service';
+import { configuredVanEmailDomain, normalizeVanId, vanEmail } from '../../auth/van-email';
 
+/**
+ * Ativação do tablet. Feita uma vez por quem administra, não pelo motorista: o motorista só
+ * usa nome e PIN para abrir o turno. Não pede e-mail.
+ */
 export function LoginScreen({ service }: { service: AuthService }) {
-  const [email, setEmail] = useState('');
+  const [van, setVan] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -10,12 +15,14 @@ export function LoginScreen({ service }: { service: AuthService }) {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(undefined);
-    if (!email.trim() || !password) return setError('Enter your email and password.');
+    const vanId = normalizeVanId(van);
+    if (!vanId) return setError('Enter the van number, e.g. 1.');
+    if (!password) return setError('Enter the activation password.');
     setBusy(true);
     try {
-      await service.signIn(email, password);
+      await service.signIn(vanEmail(vanId, configuredVanEmailDomain()), password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not sign in. Try again.');
+      setError(err instanceof Error ? err.message : 'Could not activate the tablet. Try again.');
       setBusy(false);
     }
   }
@@ -23,25 +30,25 @@ export function LoginScreen({ service }: { service: AuthService }) {
   return (
     <main className="center-screen">
       <form className="card form" onSubmit={onSubmit}>
-        <h1>Sign in</h1>
+        <h1>Activate tablet</h1>
         <p className="muted">
-          Use your operator account. The first sign-in on a tablet needs internet; after that
-          the register works offline.
+          Done once per tablet, with internet, by the manager. After that, drivers only pick their
+          name and enter a PIN, and the register works offline.
         </p>
 
         <label>
-          Email
+          Van number
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="username"
-            inputMode="email"
+            value={van}
+            onChange={(e) => setVan(e.target.value)}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="e.g. 1"
           />
         </label>
 
         <label>
-          Password
+          Activation password
           <input
             type="password"
             value={password}
@@ -57,7 +64,7 @@ export function LoginScreen({ service }: { service: AuthService }) {
         )}
 
         <button className="btn primary big" type="submit" disabled={busy}>
-          Sign in
+          Activate
         </button>
       </form>
     </main>

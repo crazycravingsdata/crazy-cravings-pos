@@ -47,8 +47,11 @@ Nunca aponte o ambiente de desenvolvimento para o projeto de produção.
 ## 2. Ativar o login
 
 No projeto: Build, Authentication, Sign-in method, ativar **Email/Password**.
-Crie as contas das vans você mesmo (Authentication, Users, Add user), por exemplo
-`van-01@seudominio.ca`. Não deixe cadastro aberto.
+Crie uma conta por van você mesmo (Authentication, Users, Add user). O e-mail é só um
+identificador interno e não precisa existir como caixa de correio: o app monta sozinho
+`van-01@vans.crazycravings.ca` a partir do número da van (para usar outro domínio, defina
+`VITE_VAN_EMAIL_DOMAIN`). A senha é a "senha de ativação" do tablet. O motorista nunca vê nem
+digita e-mail, e não existe conta por motorista. Não deixe cadastro aberto.
 
 ## 3. Criar o app web e copiar a configuração
 
@@ -84,7 +87,7 @@ Baixe uma chave de conta de serviço (Project settings, Service accounts) e guar
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS=/caminho/fora/do/git/chave.json
 
-node scripts/set-claims.mjs --project <id> --email van-01@seudominio.ca --role operator --van van-01
+node scripts/set-claims.mjs --project <id> --email van-01@vans.crazycravings.ca --role operator --van van-01
 node scripts/set-claims.mjs --project <id> --email chefe@seudominio.ca --role manager
 ```
 

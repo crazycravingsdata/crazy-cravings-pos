@@ -13,8 +13,8 @@ beforeEach(async () => {
   await db.open();
 });
 
-const pint = { variantId: 'pint-473', unitPrice: cents(650), quantity: 2 };
-const cone = { variantId: 'cone-sm', unitPrice: cents(400), quantity: 1 };
+const cup = { variantId: 'cup', unitPrice: cents(700), quantity: 2 };
+const slushy = { variantId: 'slushy', unitPrice: cents(500), quantity: 1 };
 
 describe('openShift', () => {
   it('abre o turno e enfileira o evento', async () => {
@@ -58,23 +58,23 @@ describe('completeCashSale', () => {
 
     const result = await completeCashSale(db, {
       shiftId: shift.id,
-      lines: [pint, cone],
+      lines: [cup, slushy],
       tendered: cents(2_000),
     });
 
-    expect(result.totals.total).toBe(1921);
-    expect(result.change).toBe(79);
+    expect(result.totals.total).toBe(1900);
+    expect(result.change).toBe(100);
 
     const order = await db.orders.get(result.orderId);
     expect(order?.status).toBe('paid');
     expect(order?.areaId).toBe('area-parque');
-    expect(order?.total).toBe(1921);
+    expect(order?.total).toBe(1900);
 
     expect(await db.orderLines.where('orderId').equals(result.orderId).count()).toBe(2);
 
     const payments = await db.payments.toArray();
     expect(payments).toHaveLength(1);
-    expect(payments[0]).toMatchObject({ method: 'cash', amount: 1921, change: 79, status: 'APPROVED' });
+    expect(payments[0]).toMatchObject({ method: 'cash', amount: 1900, change: 100, status: 'APPROVED' });
 
     const movements = await db.inventoryMovements.toArray();
     expect(movements.map((m) => m.qtyDelta).sort((a, b) => a - b)).toEqual([-2, -1]);
@@ -86,7 +86,7 @@ describe('completeCashSale', () => {
   it('não grava nada se o valor recebido for insuficiente', async () => {
     const shift = await openShift(db, { vanId: 'van-01', operator: 'ana', openingFloat: cents(0) });
     await expect(
-      completeCashSale(db, { shiftId: shift.id, lines: [pint], tendered: cents(100) }),
+      completeCashSale(db, { shiftId: shift.id, lines: [cup], tendered: cents(100) }),
     ).rejects.toThrow();
     expect(await db.orders.count()).toBe(0);
     expect(await db.payments.count()).toBe(0);
@@ -101,42 +101,42 @@ describe('completeCashSale', () => {
 
     await closeShift(db, { shiftId: shift.id, countedCash: cents(0) });
     await expect(
-      completeCashSale(db, { shiftId: shift.id, lines: [cone], tendered: cents(1000) }),
+      completeCashSale(db, { shiftId: shift.id, lines: [slushy], tendered: cents(1000) }),
     ).rejects.toThrow('Turno não está aberto');
   });
 
   it('não bloqueia venda quando o estoque fica negativo', async () => {
     const shift = await openShift(db, { vanId: 'van-01', operator: 'ana', openingFloat: cents(0) });
     await expect(
-      completeCashSale(db, { shiftId: shift.id, lines: [cone], tendered: cents(1000) }),
+      completeCashSale(db, { shiftId: shift.id, lines: [slushy], tendered: cents(1000) }),
     ).resolves.toBeDefined();
     const total = (await db.inventoryMovements.toArray()).reduce((s, m) => s + m.qtyDelta, 0);
     expect(total).toBe(-1);
   });
 
-  it('aplica desconto antes do HST', async () => {
+  it('aplica o desconto e não cobra imposto', async () => {
     const shift = await openShift(db, { vanId: 'van-01', operator: 'ana', openingFloat: cents(0) });
     const result = await completeCashSale(db, {
       shiftId: shift.id,
-      lines: [pint, cone],
+      lines: [cup, slushy],
       discount: { kind: 'percent', basisPoints: 1000 },
       tendered: cents(2_000),
     });
-    expect(result.totals.total).toBe(1729);
+    expect(result.totals.total).toBe(1710);
   });
 });
 
 describe('closeShift', () => {
   it('calcula esperado e diferença (fechamento cego)', async () => {
     const shift = await openShift(db, { vanId: 'van-01', operator: 'ana', openingFloat: cents(10_000) });
-    await completeCashSale(db, { shiftId: shift.id, lines: [pint, cone], tendered: cents(2_000) });
+    await completeCashSale(db, { shiftId: shift.id, lines: [cup, slushy], tendered: cents(2_000) });
     await recordCashMovement(db, { shiftId: shift.id, kind: 'in', amount: cents(1_000), reason: 'troco extra' });
     await recordCashMovement(db, { shiftId: shift.id, kind: 'out', amount: cents(500), reason: 'sangria' });
 
-    // esperado = 10000 + 1921 + 1000 - 500 = 12421
-    const closed = await closeShift(db, { shiftId: shift.id, countedCash: cents(12_400) });
-    expect(closed.expectedCash).toBe(12_421);
-    expect(closed.cashDifference).toBe(-21);
+    // esperado = 10000 + 1900 + 1000 - 500 = 12400
+    const closed = await closeShift(db, { shiftId: shift.id, countedCash: cents(12_380) });
+    expect(closed.expectedCash).toBe(12_400);
+    expect(closed.cashDifference).toBe(-20);
     expect(closed.closedAt).toBeDefined();
 
     const events = (await db.outbox.toArray()).map((e) => e.type);

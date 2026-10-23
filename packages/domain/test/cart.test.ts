@@ -8,12 +8,12 @@ import {
   type CartLine,
 } from '../src/index.js';
 
-const pint: CartLine = { variantId: 'pint-473', unitPrice: cents(650), quantity: 2 };
-const cone: CartLine = { variantId: 'cone-sm', unitPrice: cents(400), quantity: 1 };
+const cup: CartLine = { variantId: 'cup', unitPrice: cents(700), quantity: 2 };
+const slushy: CartLine = { variantId: 'slushy', unitPrice: cents(500), quantity: 1 };
 
 describe('subtotal', () => {
   it('soma preço unitário vezes quantidade', () => {
-    expect(subtotal([pint, cone])).toBe(1700);
+    expect(subtotal([cup, slushy])).toBe(1900);
   });
 
   it('retorna zero para carrinho vazio', () => {
@@ -21,9 +21,9 @@ describe('subtotal', () => {
   });
 
   it('rejeita quantidade zero, negativa ou fracionada', () => {
-    expect(() => subtotal([{ ...pint, quantity: 0 }])).toThrow(MoneyError);
-    expect(() => subtotal([{ ...pint, quantity: -1 }])).toThrow(MoneyError);
-    expect(() => subtotal([{ ...pint, quantity: 1.5 }])).toThrow(MoneyError);
+    expect(() => subtotal([{ ...cup, quantity: 0 }])).toThrow(MoneyError);
+    expect(() => subtotal([{ ...cup, quantity: -1 }])).toThrow(MoneyError);
+    expect(() => subtotal([{ ...cup, quantity: 1.5 }])).toThrow(MoneyError);
   });
 });
 
@@ -46,27 +46,32 @@ describe('discountAmount', () => {
 });
 
 describe('orderTotals', () => {
-  it('calcula sem desconto: HST sobre o subtotal', () => {
-    const t = orderTotals([pint, cone]);
-    expect(t).toEqual({
-      subtotal: 1700,
+  it('sem imposto por padrão: total é o subtotal', () => {
+    expect(orderTotals([cup, slushy])).toEqual({
+      subtotal: 1900,
       discount: 0,
-      taxableBase: 1700,
-      hst: 221, // 13% de 1700
-      total: 1921,
+      taxableBase: 1900,
+      hst: 0,
+      total: 1900,
     });
   });
 
-  it('aplica o desconto antes do HST', () => {
-    const t = orderTotals([pint, cone], { kind: 'percent', basisPoints: 1000 });
-    expect(t.discount).toBe(170);
-    expect(t.taxableBase).toBe(1530);
-    expect(t.hst).toBe(199); // 13% de 1530 = 198,9 -> 199
-    expect(t.total).toBe(1729);
+  it('aplica o desconto e continua sem imposto', () => {
+    const t = orderTotals([cup, slushy], { kind: 'percent', basisPoints: 1000 });
+    expect(t.discount).toBe(190);
+    expect(t.hst).toBe(0);
+    expect(t.total).toBe(1710);
   });
 
-  it('total é sempre base tributável mais HST', () => {
-    const t = orderTotals([cone], { kind: 'fixed', amount: cents(100) });
+  it('com alíquota explícita, o desconto vem antes do imposto (HST 13%)', () => {
+    const t = orderTotals([cup, slushy], { kind: 'percent', basisPoints: 1000 }, 1300);
+    expect(t.taxableBase).toBe(1710);
+    expect(t.hst).toBe(222); // 13% de 1710 = 222,3 -> 222
+    expect(t.total).toBe(1932);
+  });
+
+  it('total é sempre base mais imposto', () => {
+    const t = orderTotals([slushy], { kind: 'fixed', amount: cents(100) }, 1300);
     expect(t.total).toBe(t.taxableBase + t.hst);
   });
 });

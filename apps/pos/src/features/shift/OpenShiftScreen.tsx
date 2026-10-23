@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { cents, formatCad } from '@crazy-cravings/domain';
-import type { DriverRecord, Shift } from '../../db/schema';
+import type { DriverRecord } from '../../db/schema';
 import { parseMoneyToCents } from '../../lib/money-input';
 import { db } from '../../state/db';
 import { VAN_IDS, saveIdentity } from '../../state/session';
@@ -9,7 +8,6 @@ import { openShift } from './shift';
 
 /** Tablet logado com a conta da van: a van vem do login e o motorista se identifica por PIN. */
 export type Account = {
-  email: string;
   vanId: string;
   canSignOut: boolean;
   onSignOut: () => void;
@@ -18,7 +16,6 @@ export type Account = {
 type Props = {
   initialVanId: string | undefined;
   initialOperator: string | undefined;
-  lastClosed: Shift | undefined;
   account?: Account;
   /** Lista local de motoristas (usada só com conta da van). */
   drivers: readonly DriverRecord[];
@@ -27,7 +24,6 @@ type Props = {
 export function OpenShiftScreen({
   initialVanId,
   initialOperator,
-  lastClosed,
   account,
   drivers,
 }: Props) {
@@ -114,20 +110,6 @@ export function OpenShiftScreen({
     <main className="center-screen">
       <form className="card form" onSubmit={onSubmit}>
         <h1>Open shift</h1>
-
-        {account && <p className="muted">Tablet signed in as {account.email}</p>}
-
-        {lastClosed && (
-          <div className="notice" role="status">
-            <strong>Last shift closed.</strong>{' '}
-            Expected {formatCad(cents(lastClosed.expectedCash ?? 0))}, counted{' '}
-            {formatCad(cents(lastClosed.countedCash ?? 0))}, difference{' '}
-            <span className={(lastClosed.cashDifference ?? 0) === 0 ? 'ok' : 'warn'}>
-              {formatCad(cents(lastClosed.cashDifference ?? 0))}
-            </span>
-            .
-          </div>
-        )}
 
         <label>
           Van

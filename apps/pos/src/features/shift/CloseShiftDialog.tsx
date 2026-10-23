@@ -8,7 +8,7 @@ import { closeShift } from './shift';
 type Props = {
   shift: Shift;
   onCancel: () => void;
-  onClosed: (closed: Shift) => void;
+  onClosed?: (closed: Shift) => void;
 };
 
 /** Fechamento cego: o esperado não é mostrado antes da contagem. */
@@ -24,7 +24,10 @@ export function CloseShiftDialog({ shift, onCancel, onClosed }: Props) {
     if (countedCash === null) return setError('Enter the counted cash, e.g. 250.00');
     setBusy(true);
     try {
-      onClosed(await closeShift(db, { shiftId: shift.id, countedCash }));
+      // Fechar primeiro, avisar depois: `onClosed?.(await ...)` não executaria o fechamento
+      // quando onClosed não existe.
+      const closed = await closeShift(db, { shiftId: shift.id, countedCash });
+      onClosed?.(closed);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not close the shift.');
       setBusy(false);
@@ -42,7 +45,6 @@ export function CloseShiftDialog({ shift, onCancel, onClosed }: Props) {
         </div>
         <p className="muted">
           Count all the cash in the drawer, including the opening float, and enter the total.
-          The expected amount is shown after closing.
         </p>
         <label>
           Counted cash (CAD)

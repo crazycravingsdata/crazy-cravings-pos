@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuthState } from './auth/useAuthState';
-import type { Shift } from './db/schema';
 import { seedDemoCatalogIfEmpty } from './features/catalog/seed';
 import { BlockedScreen } from './features/auth/BlockedScreen';
 import { LoginScreen } from './features/auth/LoginScreen';
@@ -42,7 +41,6 @@ export function AppView({ firebase }: { firebase: FirebaseServices | undefined }
   const { status, pending } = useSyncEngine(signedIn ? firebase?.sender : undefined);
   useDriverSync(firebase?.fetchDrivers, signedIn !== undefined);
   const drivers = useLiveQuery(() => db.drivers.toArray(), [], []);
-  const [lastClosed, setLastClosed] = useState<Shift | undefined>();
 
   useEffect(() => {
     if (import.meta.env.VITE_SEED_DEMO === 'false') return;
@@ -87,11 +85,9 @@ export function AppView({ firebase }: { firebase: FirebaseServices | undefined }
       <OpenShiftScreen
         initialVanId={session.vanId}
         initialOperator={session.operator}
-        lastClosed={lastClosed}
         drivers={drivers}
         {...(signedIn && {
           account: {
-            email: signedIn.email,
             vanId: signedIn.vanId,
             canSignOut,
             onSignOut: signOut,
@@ -101,5 +97,5 @@ export function AppView({ firebase }: { firebase: FirebaseServices | undefined }
     );
   }
 
-  return <SaleScreen shift={session.shift} syncStatus={status} onShiftClosed={setLastClosed} />;
+  return <SaleScreen shift={session.shift} syncStatus={status} />;
 }

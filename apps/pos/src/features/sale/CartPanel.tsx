@@ -58,20 +58,24 @@ export function CartPanel({ cart, onDiscount, onPay }: Props) {
       </ul>
 
       <dl className="totals">
-        <div>
-          <dt>Subtotal</dt>
-          <dd>{formatCad(totals.subtotal)}</dd>
-        </div>
+        {(totals.discount > 0 || totals.hst > 0) && (
+          <div>
+            <dt>Subtotal</dt>
+            <dd>{formatCad(totals.subtotal)}</dd>
+          </div>
+        )}
         {totals.discount > 0 && (
           <div>
             <dt>Discount</dt>
             <dd>-{formatCad(totals.discount)}</dd>
           </div>
         )}
-        <div>
-          <dt>HST 13%</dt>
-          <dd>{formatCad(totals.hst)}</dd>
-        </div>
+        {totals.hst > 0 && (
+          <div>
+            <dt>Tax</dt>
+            <dd>{formatCad(totals.hst)}</dd>
+          </div>
+        )}
         <div className="grand">
           <dt>Total</dt>
           <dd data-testid="cart-total">{formatCad(totals.total)}</dd>

@@ -14,10 +14,9 @@ type Dialog = 'none' | 'pay' | 'discount' | 'close';
 type Props = {
   shift: Shift;
   syncStatus: SyncStatus;
-  onShiftClosed: (closed: Shift) => void;
 };
 
-export function SaleScreen({ shift, syncStatus, onShiftClosed }: Props) {
+export function SaleScreen({ shift, syncStatus }: Props) {
   const cart = useCart();
   const [dialog, setDialog] = useState<Dialog>('none');
 
@@ -70,11 +69,7 @@ export function SaleScreen({ shift, syncStatus, onShiftClosed }: Props) {
         />
       )}
       {dialog === 'close' && (
-        <CloseShiftDialog
-          shift={shift}
-          onCancel={() => setDialog('none')}
-          onClosed={onShiftClosed}
-        />
+        <CloseShiftDialog shift={shift} onCancel={() => setDialog('none')} />
       )}
     </div>
   );

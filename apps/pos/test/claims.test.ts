@@ -34,8 +34,8 @@ describe('resolveAccess', () => {
 });
 
 describe('friendlyAuthError', () => {
-  it('traduz credenciais erradas sem revelar se o email existe', () => {
-    const msg = 'Wrong email or password.';
+  it('traduz credenciais erradas sem revelar se a van existe', () => {
+    const msg = 'Wrong van number or activation password.';
     expect(friendlyAuthError('auth/invalid-credential')).toBe(msg);
     expect(friendlyAuthError('auth/user-not-found')).toBe(msg);
     expect(friendlyAuthError('auth/wrong-password')).toBe(msg);

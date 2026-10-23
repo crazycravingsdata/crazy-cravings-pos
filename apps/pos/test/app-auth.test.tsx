@@ -93,39 +93,53 @@ describe('login do tablet da van', () => {
   it('mostra a tela de login quando não há sessão', async () => {
     const { firebase } = fakeFirebase({ kind: 'signed-out' });
     render(<AppView firebase={firebase} />);
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Activate tablet' })).toBeTruthy();
+    expect(screen.queryByLabelText(/email/i)).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Open shift' })).toBeNull();
   });
 
-  it('envia email e senha ao entrar', async () => {
+  it('monta o e-mail interno a partir do número da van e envia a senha', async () => {
     const { firebase, signIn } = fakeFirebase({ kind: 'signed-out' });
     render(<AppView firebase={firebase} />);
-    fireEvent.change(await screen.findByLabelText('Email'), {
-      target: { value: 'van-01@crazycravings.ca' },
-    });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'segredo123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent.change(await screen.findByLabelText('Van number'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Activation password'), { target: { value: 'segredo123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
     await waitFor(() =>
-      expect(signIn).toHaveBeenCalledWith('van-01@crazycravings.ca', 'segredo123'),
+      expect(signIn).toHaveBeenCalledWith('van-01@vans.crazycravings.ca', 'segredo123'),
     );
   });
 
-  it('mostra o erro quando o login falha', async () => {
-    const signIn = vi.fn().mockRejectedValue(new Error('Wrong email or password.'));
+  it('mostra o erro quando a ativação falha', async () => {
+    const signIn = vi.fn().mockRejectedValue(new Error('Wrong van number or activation password.'));
     const { firebase } = fakeFirebase({ kind: 'signed-out' }, { signIn });
     render(<AppView firebase={firebase} />);
-    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'a@b.ca' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('Wrong email or password.');
+    fireEvent.change(await screen.findByLabelText('Van number'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Activation password'), { target: { value: 'x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Wrong van number or activation password.',
+    );
   });
 
-  it('exige email e senha antes de chamar o login', async () => {
+  it('exige número da van e senha antes de chamar a ativação', async () => {
     const { firebase, signIn } = fakeFirebase({ kind: 'signed-out' });
     render(<AppView firebase={firebase} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
-    expect((await screen.findByRole('alert')).textContent).toMatch(/Enter your email/);
+    fireEvent.click(await screen.findByRole('button', { name: 'Activate' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/van number/);
+    fireEvent.change(screen.getByLabelText('Van number'), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/van number/);
     expect(signIn).not.toHaveBeenCalled();
+  });
+
+  it('a tela de turno não mostra e-mail nem o resumo do turno anterior', async () => {
+    const { firebase } = fakeFirebase(van('van-01'), {
+      drivers: [await makeDriver('d1', 'Ana', '4821')],
+    });
+    render(<AppView firebase={firebase} />);
+    await screen.findByRole('heading', { name: 'Open shift' });
+    expect(screen.queryByText(/@/)).toBeNull();
+    expect(screen.queryByText(/Last shift/)).toBeNull();
   });
 
   it('a van do claim fica travada e vale mais do que a van salva no tablet', async () => {
@@ -193,10 +207,33 @@ describe('login do tablet da van', () => {
     await db.outbox.add(buildOutboxEvent('van-01', 'sale.created', { n: 1 }));
     const { firebase, sender, fetchDrivers } = fakeFirebase({ kind: 'signed-out' });
     render(<AppView firebase={firebase} />);
-    await screen.findByRole('heading', { name: 'Sign in' });
+    await screen.findByRole('heading', { name: 'Activate tablet' });
     await new Promise((r) => setTimeout(r, 50));
     expect(sender).not.toHaveBeenCalled();
     expect(fetchDrivers).not.toHaveBeenCalled();
+  });
+});
+
+describe('fechamento de turno pela tela', () => {
+  it('fecha o turno, grava a diferença e volta para a abertura sem mostrar resumo', async () => {
+    await openShift(db, { vanId: 'van-01', operator: 'Ana', openingFloat: cents(10_000) });
+    const { firebase } = fakeFirebase(van('van-01'), {
+      drivers: [await makeDriver('d1', 'Ana', '4821')],
+    });
+    render(<AppView firebase={firebase} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Close shift' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Close shift' });
+    expect(dialog.textContent).not.toMatch(/\$/); // fechamento cego
+    fireEvent.change(screen.getByLabelText('Counted cash (CAD)'), { target: { value: '99.50' } });
+    fireEvent.click(Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Close shift')!);
+
+    expect(await screen.findByRole('heading', { name: 'Open shift' })).toBeTruthy();
+    const shifts = await db.shifts.toArray();
+    expect(shifts).toHaveLength(1);
+    expect(shifts[0]).toMatchObject({ countedCash: 9_950, expectedCash: 10_000, cashDifference: -50 });
+    expect(shifts[0]?.closedAt).toBeDefined();
+    expect(screen.queryByText(/Last shift|Expected|difference/)).toBeNull();
   });
 });
 

@@ -9,7 +9,7 @@ export function friendlyAuthError(code: string | undefined): string {
     case 'auth/wrong-password':
     case 'auth/user-not-found':
     case 'auth/invalid-email':
-      return 'Wrong email or password.';
+      return 'Wrong van number or activation password.';
     case 'auth/too-many-requests':
       return 'Too many attempts. Wait a few minutes and try again.';
     case 'auth/user-disabled':
