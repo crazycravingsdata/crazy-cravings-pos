@@ -6,10 +6,12 @@ import type { PosDatabase } from '../../db/schema';
  * quando o banco local está vazio. Desligue com VITE_SEED_DEMO=false.
  */
 export async function seedDemoCatalogIfEmpty(db: PosDatabase): Promise<boolean> {
-  if ((await db.products.count()) > 0) return false;
   const t = Date.now();
 
-  await db.transaction('rw', [db.categories, db.products, db.variants], async () => {
+  // A checagem fica DENTRO da transação: duas chamadas simultâneas (StrictMode,
+  // duas abas) não passam juntas pelo "banco vazio" e não geram chave duplicada.
+  return db.transaction('rw', [db.categories, db.products, db.variants], async () => {
+    if ((await db.products.count()) > 0) return false;
     await db.categories.bulkAdd([
       { id: 'cat-scoops', name: 'Scoops', sortOrder: 1, updatedAt: t },
       { id: 'cat-treats', name: 'Treats', sortOrder: 2, updatedAt: t },
@@ -31,6 +33,6 @@ export async function seedDemoCatalogIfEmpty(db: PosDatabase): Promise<boolean> 
       { id: 'v-sundae', productId: 'p-sundae', label: 'Regular', priceCents: 900, updatedAt: t },
       { id: 'v-pint', productId: 'p-pint', label: '473 ml', priceCents: 1200, updatedAt: t },
     ]);
+    return true;
   });
-  return true;
 }
