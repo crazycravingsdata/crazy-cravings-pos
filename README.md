@@ -8,7 +8,7 @@ Sistema de caixa (PDV) offline-first para as vans e feiras da Crazy Cravings.
 - `apps/pos`: PWA para tablet Android (React + Vite + Dexie). Abertura de turno, venda em dinheiro, desconto, fechamento cego e fila de sincronização.
 - `apps/manager`: painel web do escritório (a criar depois).
 - `infra`: regras do Firestore e seus testes.
-- `scripts`: utilitários de administração (definir role e van de cada conta).
+- `scripts`: administração (`set-claims.mjs` define a conta de cada van; `drivers.mjs` cadastra motoristas e PINs).
 
 ## Requisitos
 
@@ -35,12 +35,19 @@ Enquanto não existe a tela de cadastro de produtos, o PDV carrega um catálogo
 FICTÍCIO (itens e preços de exemplo) quando o banco local está vazio. Para
 desligar, defina `VITE_SEED_DEMO=false`.
 
-## Login e sincronização
+## Login, motoristas e sincronização
 
-Sem as variáveis `VITE_FIREBASE_*` o PDV roda em modo local: sem login e sem
-sincronização (mostra "Sync not set up"). Com elas, o operador entra com a conta
-dele, a van vem do login e as vendas são enviadas ao Firestore quando há sinal.
-O passo a passo está em `docs/firestore-setup.md`.
+Sem as variáveis `VITE_FIREBASE_*` o PDV roda em modo local: sem login, sem motoristas
+por PIN e sem sincronização (mostra "Sync not set up").
+
+Com elas, funciona em duas camadas:
+
+- o tablet entra uma vez com a conta da sua van (a van vem da conta);
+- o motorista escolhe o nome e digita o PIN para abrir o turno, o que dispensa conta
+  individual e facilita a troca de motoristas.
+
+Os motoristas são cadastrados com `scripts/drivers.mjs`. O passo a passo completo, o que o
+PIN protege e o que não protege, está em `docs/firestore-setup.md`.
 
 As regras do Firestore (`infra/firestore.rules`) têm testes em
 `infra/test/firestore.rules.test.js`, que precisam do emulador do Firebase.

@@ -6,6 +6,8 @@ import { buildOutboxEvent } from '../../sync/outbox';
 export type OpenShiftInput = {
   vanId: string;
   operator: string;
+  /** Motorista identificado por PIN (ausente no modo local). */
+  driverId?: string;
   openingFloat: Cents;
   eventId?: string;
   areaId?: string;
@@ -29,6 +31,7 @@ export async function openShift(
     openedBy: input.operator,
     openingFloat: input.openingFloat,
     openedAt: now,
+    ...(input.driverId !== undefined && { driverId: input.driverId }),
     ...(input.eventId !== undefined && { eventId: input.eventId }),
     ...(input.areaId !== undefined && { areaId: input.areaId }),
   };

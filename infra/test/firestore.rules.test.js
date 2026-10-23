@@ -150,6 +150,34 @@ describe('catálogo e cadastro de vans', () => {
     await assertSucceeds(setDoc(vanRef(admin()), { name: 'Van 1' }));
   });
 
+  describe('motoristas', () => {
+    const driverRef = (ctx) => doc(ctx.firestore(), 'drivers/d1');
+    const driver = {
+      name: 'Ana',
+      active: true,
+      pinSalt: 'aa',
+      pinHash: 'bb',
+      pinIterations: 100000,
+      updatedAt: 1,
+    };
+
+    it('o tablet da van lê a lista de motoristas', async () => {
+      await assertSucceeds(getDoc(driverRef(operator('van-01'))));
+    });
+
+    it('sem login não lê a lista', async () => {
+      await assertFails(getDoc(driverRef(env.unauthenticatedContext())));
+    });
+
+    it('o tablet da van NÃO cadastra nem altera motoristas', async () => {
+      await assertFails(setDoc(driverRef(operator('van-01')), driver));
+    });
+
+    it('o gerente cadastra e altera motoristas', async () => {
+      await assertSucceeds(setDoc(driverRef(manager()), driver));
+    });
+  });
+
   it('coleções desconhecidas são negadas', async () => {
     const ref = doc(admin().firestore(), 'segredos/x');
     await assertFails(getDoc(ref));

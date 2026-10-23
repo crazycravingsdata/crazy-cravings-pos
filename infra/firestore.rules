@@ -67,6 +67,13 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
+    // Motoristas: o tablet da van lê a lista (com o hash do PIN, nunca o PIN);
+    // só a gestão escreve.
+    match /drivers/{driverId} {
+      allow read: if signedIn();
+      allow write: if isManager();
+    }
+
     // Todo o resto é negado por padrão.
     match /{document=**} {
       allow read, write: if false;

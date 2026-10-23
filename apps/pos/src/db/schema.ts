@@ -21,10 +21,27 @@ export type Variant = {
   updatedAt: number;
 };
 
+/**
+ * Motorista cadastrado pela gestão. Vem do Firestore (coleção `drivers`) e fica
+ * salvo no tablet para o início de turno funcionar offline. Guarda só o hash do PIN.
+ */
+export type DriverRecord = {
+  id: string;
+  name: string;
+  active: boolean;
+  pinSalt: string;
+  pinHash: string;
+  pinIterations: number;
+  updatedAt: number;
+};
+
 export type Shift = {
   id: string;
   vanId: string;
+  /** Nome do motorista que abriu o turno. */
   openedBy: string;
+  /** Motorista identificado por PIN (ausente no modo local, sem login). */
+  driverId?: string;
   openingFloat: number;
   openedAt: number;
   /** Feira ou evento do dia, quando houver. */
@@ -143,6 +160,7 @@ export class PosDatabase extends Dexie {
   inventoryMovements!: Table<InventoryMovement, string>;
   outbox!: Table<OutboxEvent, string>;
   meta!: Table<Meta, string>;
+  drivers!: Table<DriverRecord, string>;
 
   constructor(name = 'crazy-cravings-pos') {
     super(name);
@@ -158,6 +176,10 @@ export class PosDatabase extends Dexie {
       inventoryMovements: 'id, vanId, variantId, createdAt',
       outbox: 'id, status, createdAt',
       meta: 'key',
+    });
+    // v2: lista local de motoristas (identificação por PIN).
+    this.version(2).stores({
+      drivers: 'id, active',
     });
   }
 }

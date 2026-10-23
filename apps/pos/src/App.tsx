@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuthState } from './auth/useAuthState';
 import type { Shift } from './db/schema';
 import { seedDemoCatalogIfEmpty } from './features/catalog/seed';
@@ -9,6 +10,7 @@ import { OpenShiftScreen } from './features/shift/OpenShiftScreen';
 import { loadFirebase, type FirebaseServices } from './firebase';
 import { db } from './state/db';
 import { useSession } from './state/session';
+import { useDriverSync } from './sync/driver-sync';
 import { useSyncEngine } from './sync/useSync';
 
 /** Carrega o Firebase (se configurado) e entrega ao AppView. */
@@ -38,6 +40,8 @@ export function AppView({ firebase }: { firebase: FirebaseServices | undefined }
   const session = useSession(signedIn?.vanId);
   // Só sincroniza com conta logada. Em modo local, fica desligado.
   const { status, pending } = useSyncEngine(signedIn ? firebase?.sender : undefined);
+  useDriverSync(firebase?.fetchDrivers, signedIn !== undefined);
+  const drivers = useLiveQuery(() => db.drivers.toArray(), [], []);
   const [lastClosed, setLastClosed] = useState<Shift | undefined>();
 
   useEffect(() => {
@@ -84,6 +88,7 @@ export function AppView({ firebase }: { firebase: FirebaseServices | undefined }
         initialVanId={session.vanId}
         initialOperator={session.operator}
         lastClosed={lastClosed}
+        drivers={drivers}
         {...(signedIn && {
           account: {
             email: signedIn.email,
