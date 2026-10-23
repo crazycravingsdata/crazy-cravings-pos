@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { Shift } from '../../db/schema';
 import { CloseShiftDialog } from '../shift/CloseShiftDialog';
 import type { SyncStatus } from '../../sync/useSync';
+import { GpsBadge } from '../../ui/GpsBadge';
 import { SyncBadge } from '../../ui/SyncBadge';
+import type { TrackingStatus } from '../tracking/tracker';
 import { CartPanel } from './CartPanel';
 import { CatalogGrid } from './CatalogGrid';
 import { DiscountDialog } from './DiscountDialog';
@@ -14,9 +16,10 @@ type Dialog = 'none' | 'pay' | 'discount' | 'close';
 type Props = {
   shift: Shift;
   syncStatus: SyncStatus;
+  gpsStatus?: TrackingStatus;
 };
 
-export function SaleScreen({ shift, syncStatus }: Props) {
+export function SaleScreen({ shift, syncStatus, gpsStatus = 'off' }: Props) {
   const cart = useCart();
   const [dialog, setDialog] = useState<Dialog>('none');
 
@@ -31,6 +34,7 @@ export function SaleScreen({ shift, syncStatus }: Props) {
           </span>
         </div>
         <div className="topbar-right">
+          <GpsBadge status={gpsStatus} />
           <SyncBadge status={syncStatus} />
           <button className="btn" onClick={() => setDialog('close')}>
             Close shift

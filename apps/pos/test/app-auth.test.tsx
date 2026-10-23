@@ -10,6 +10,7 @@ import { MAX_PIN_FAILURES } from '../src/features/drivers/drivers';
 import { openShift } from '../src/features/shift/shift';
 import type { FirebaseServices } from '../src/firebase';
 import { db } from '../src/state/db';
+import { saveIdentity } from '../src/state/session';
 import { buildOutboxEvent } from '../src/sync/outbox';
 
 // O jsdom não traz WebCrypto completo; usa o do Node, que é o mesmo algoritmo do navegador.
@@ -365,5 +366,143 @@ describe('abertura de turno por motorista e PIN', () => {
       expect(screen.queryByRole('option', { name: 'Beto' })).toBeNull();
     });
     expect((await db.drivers.toArray()).map((d) => d.id)).toEqual(['d1']);
+  });
+});
+
+describe('rastreamento por GPS', () => {
+  type WatchOk = (p: {
+    coords: { latitude: number; longitude: number; accuracy: number; speed: null; heading: null };
+    timestamp: number;
+  }) => void;
+
+  function stubGeolocation(behavior: 'fix' | 'denied') {
+    const watchPosition = vi.fn((ok: WatchOk, err?: (e: { code: number }) => void) => {
+      if (behavior === 'fix') {
+        ok({
+          coords: { latitude: 43.2557, longitude: -79.8711, accuracy: 9, speed: null, heading: null },
+          timestamp: Date.now(),
+        });
+      } else {
+        err?.({ code: 1 });
+      }
+      return 1;
+    });
+    const clearWatch = vi.fn();
+    Object.defineProperty(navigator, 'geolocation', {
+      value: { watchPosition, clearWatch },
+      configurable: true,
+    });
+    return { watchPosition, clearWatch };
+  }
+
+  const locationEvents = () => db.outbox.filter((e) => e.type === 'location.recorded').toArray();
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'geolocation');
+  });
+
+  it('com conta logada e turno aberto, grava a posição e mostra o selo GPS', async () => {
+    const geo = stubGeolocation('fix');
+    await openShift(db, { vanId: 'van-01', operator: 'Ana', openingFloat: cents(10_000) });
+    const { firebase } = fakeFirebase(van('van-01'));
+    render(<AppView firebase={firebase} />);
+
+    expect(await screen.findByRole('status', { name: 'Location: GPS on' })).toBeTruthy();
+    expect(geo.watchPosition).toHaveBeenCalled();
+    await waitFor(async () => expect(await locationEvents()).toHaveLength(1));
+    expect((await locationEvents())[0]).toMatchObject({
+      vanId: 'van-01',
+      payload: { lat: 43.2557, lng: -79.8711 },
+    });
+  });
+
+  it('os pontos de GPS não aparecem na contagem "to send" do selo de sincronização', async () => {
+    stubGeolocation('fix');
+    await openShift(db, { vanId: 'van-01', operator: 'Ana', openingFloat: cents(10_000) });
+    const { firebase } = fakeFirebase(van('van-01'));
+    render(<AppView firebase={firebase} />);
+    await waitFor(async () => expect(await locationEvents()).toHaveLength(1));
+    // Só o evento "shift.opened" está sem enviar; o ponto de GPS não entra na conta.
+    expect((await screen.findByText(/to send/)).textContent).toMatch(/1 to send/);
+    expect(screen.queryByText(/2 to send/)).toBeNull();
+  });
+
+  it('para de rastrear quando o turno fecha', async () => {
+    const geo = stubGeolocation('fix');
+    await openShift(db, { vanId: 'van-01', operator: 'Ana', openingFloat: cents(10_000) });
+    const { firebase } = fakeFirebase(van('van-01'), {
+      drivers: [await makeDriver('d1', 'Ana', '4821')],
+    });
+    render(<AppView firebase={firebase} />);
+    await screen.findByRole('status', { name: 'Location: GPS on' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Close shift' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Close shift' });
+    fireEvent.change(screen.getByLabelText('Counted cash (CAD)'), { target: { value: '100' } });
+    fireEvent.click(Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Close shift')!);
+
+    expect(await screen.findByRole('heading', { name: 'Open shift' })).toBeTruthy();
+    expect(geo.clearWatch).toHaveBeenCalled();
+    expect(screen.queryByRole('status', { name: /Location/ })).toBeNull();
+  });
+
+  it('avisa quando a permissão de localização foi negada', async () => {
+    stubGeolocation('denied');
+    await openShift(db, { vanId: 'van-01', operator: 'Ana', openingFloat: cents(10_000) });
+    const { firebase } = fakeFirebase(van('van-01'));
+    render(<AppView firebase={firebase} />);
+    expect(await screen.findByRole('status', { name: 'Location: GPS blocked: allow location' })).toBeTruthy();
+    expect(await locationEvents()).toHaveLength(0);
+  });
+
+  it('avisa quando o aparelho não tem GPS', async () => {
+    await openShift(db, { vanId: 'van-01', operator: 'Ana', openingFloat: cents(10_000) });
+    const { firebase } = fakeFirebase(van('van-01'));
+    render(<AppView firebase={firebase} />);
+    expect(await screen.findByRole('status', { name: 'Location: GPS not available' })).toBeTruthy();
+  });
+
+  it('no modo local (sem conta) não rastreia', async () => {
+    const geo = stubGeolocation('fix');
+    await saveIdentity('van-01', 'Ana');
+    await openShift(db, { vanId: 'van-01', operator: 'Ana', openingFloat: cents(10_000) });
+    render(<AppView firebase={undefined} />);
+    await screen.findByRole('button', { name: 'Close shift' });
+    expect(geo.watchPosition).not.toHaveBeenCalled();
+    expect(screen.queryByRole('status', { name: /Location/ })).toBeNull();
+  });
+
+  it('VITE_TRACKING=false desliga o rastreamento', async () => {
+    vi.stubEnv('VITE_TRACKING', 'false');
+    const geo = stubGeolocation('fix');
+    await openShift(db, { vanId: 'van-01', operator: 'Ana', openingFloat: cents(10_000) });
+    const { firebase } = fakeFirebase(van('van-01'));
+    render(<AppView firebase={firebase} />);
+    await screen.findByRole('button', { name: 'Close shift' });
+    expect(geo.watchPosition).not.toHaveBeenCalled();
+  });
+
+  it('a tela de abertura de turno avisa que a posição é gravada (só com conta logada)', async () => {
+    const { firebase } = fakeFirebase(van('van-01'));
+    render(<AppView firebase={firebase} />);
+    expect(await screen.findByText(/van location is recorded while the shift is open/i)).toBeTruthy();
+    cleanup();
+    render(<AppView firebase={undefined} />);
+    await screen.findByRole('heading', { name: 'Open shift' });
+    expect(screen.queryByText(/van location is recorded/i)).toBeNull();
+  });
+
+  it('pontos de GPS não enviados também bloqueiam a saída da conta', async () => {
+    await db.outbox.add(
+      buildOutboxEvent('van-01', 'location.recorded', { shiftId: 's', lat: 1, lng: 2, recordedAt: 1 }),
+    );
+    const { firebase, signOut } = fakeFirebase(van('van-01'), {
+      drivers: [await makeDriver('d1', 'Ana', '4821')],
+    });
+    render(<AppView firebase={firebase} />);
+    const button = (await screen.findByRole('button', { name: 'Sign out tablet' })) as HTMLButtonElement;
+    await waitFor(() => expect(button.disabled).toBe(true));
+    fireEvent.click(button);
+    expect(signOut).not.toHaveBeenCalled();
   });
 });

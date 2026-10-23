@@ -130,7 +130,8 @@ export type OutboxEventType =
   | 'shift.closed'
   | 'sale.created'
   | 'cash.moved'
-  | 'inventory.moved';
+  | 'inventory.moved'
+  | 'location.recorded';
 
 export type OutboxStatus = 'pending' | 'sent';
 

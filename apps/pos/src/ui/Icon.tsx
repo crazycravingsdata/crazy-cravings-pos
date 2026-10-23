@@ -24,6 +24,12 @@ const PATHS: Record<string, ReactNode> = {
     <path d="M3 3l18 18M9 16a5 5 0 016 0M6 12.5a9.5 9.5 0 014-2.3M14.5 10.5a9.5 9.5 0 013.5 2M12 19.5h.01" />
   ),
   cloud: <path d="M7 18a4 4 0 01-.5-8 5.5 5.5 0 0110.7 1A3.5 3.5 0 0117 18H7z" />,
+  'map-pin': (
+    <>
+      <path d="M12 21s-6-5.2-6-10a6 6 0 0112 0c0 4.8-6 10-6 10z" />
+      <circle cx="12" cy="11" r="2.2" />
+    </>
+  ),
   cash: (
     <>
       <rect x="3" y="7" width="18" height="10" rx="2" />

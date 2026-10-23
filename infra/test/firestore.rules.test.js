@@ -79,6 +79,27 @@ describe('eventos de venda: criação', () => {
     );
   });
 
+  it('aceita ponto de GPS (location.recorded) da própria van', async () => {
+    await assertSucceeds(
+      setDoc(
+        eventRef(operator('van-01'), 'van-01', 'gps1'),
+        event('van-01', {
+          type: 'location.recorded',
+          payload: { shiftId: 's1', lat: 43.2557, lng: -79.8711, accuracy: 9, recordedAt: 1_700_000_000_000 },
+        }),
+      ),
+    );
+  });
+
+  it('NÃO aceita ponto de GPS gravado em outra van', async () => {
+    await assertFails(
+      setDoc(
+        eventRef(operator('van-01'), 'van-02', 'gps1'),
+        event('van-02', { type: 'location.recorded', payload: { lat: 1, lng: 2 } }),
+      ),
+    );
+  });
+
   it('rejeita tipo de evento desconhecido', async () => {
     await assertFails(
       setDoc(eventRef(operator('van-01'), 'van-01'), event('van-01', { type: 'hack' })),

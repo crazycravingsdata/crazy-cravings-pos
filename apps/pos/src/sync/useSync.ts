@@ -25,6 +25,18 @@ const FLUSH_INTERVAL_MS = 30_000;
  */
 export function useSyncEngine(sender: EventSender | undefined): SyncEngine {
   const pending = useLiveQuery(() => db.outbox.where('status').equals('pending').count(), [], 0);
+  // Pontos de GPS não entram na contagem do selo: são centenas por dia e confundem.
+  // Eles ainda contam em `pending`, que impede sair da conta com dados sem enviar.
+  const pendingVisible = useLiveQuery(
+    () =>
+      db.outbox
+        .where('status')
+        .equals('pending')
+        .filter((e) => e.type !== 'location.recorded')
+        .count(),
+    [],
+    0,
+  );
   const [online, setOnline] = useState(() => navigator.onLine);
 
   useEffect(() => {
@@ -57,8 +69,8 @@ export function useSyncEngine(sender: EventSender | undefined): SyncEngine {
 
   let status: SyncStatus;
   if (!sender) status = { kind: 'disabled' };
-  else if (!online) status = { kind: 'offline', pending };
-  else if (pending > 0) status = { kind: 'pending', pending };
+  else if (!online) status = { kind: 'offline', pending: pendingVisible };
+  else if (pendingVisible > 0) status = { kind: 'pending', pending: pendingVisible };
   else status = { kind: 'synced' };
 
   return { status, pending };

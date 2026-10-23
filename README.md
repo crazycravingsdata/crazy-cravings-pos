@@ -10,6 +10,12 @@ Sistema de caixa (PDV) offline-first para as vans e feiras da Crazy Cravings.
 - `infra`: regras do Firestore e seus testes.
 - `scripts`: administração (`set-claims.mjs` define a conta de cada van; `drivers.mjs` cadastra motoristas e PINs).
 
+## Rastreamento das vans
+
+Com conta de van logada e turno aberto, o app grava a posição do tablet a cada 30 s e envia
+junto com as vendas (evento `location.recorded`). Detalhes, limites e roteiro do piloto em
+[`docs/tracking.md`](docs/tracking.md). Para desligar, defina `VITE_TRACKING=false`.
+
 ## Requisitos
 
 - Node.js 22 LTS
@@ -33,7 +39,7 @@ pnpm --filter @crazy-cravings/pos build
 
 Enquanto não existe a tela de cadastro de produtos, o PDV carrega um catálogo inicial
 quando o banco local está vazio: Ice Cream Cup, Slushy, Pop e Water seguem o cardápio
-impresso; o preço do Sundae é PROVISÓRIO (não consta no cardápio que temos). Para
+impresso; o Sundae custa $8.00 (valor informado pela gestão). Para
 desligar, defina `VITE_SEED_DEMO=false`.
 
 ## Imposto

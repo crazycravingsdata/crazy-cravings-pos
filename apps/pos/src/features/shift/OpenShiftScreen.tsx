@@ -192,6 +192,12 @@ export function OpenShiftScreen({
           />
         </label>
 
+        {account && (
+          <p className="muted">
+            The van location is recorded while the shift is open. Allow location if the tablet asks.
+          </p>
+        )}
+
         {error && (
           <p className="error" role="alert">
             {error}

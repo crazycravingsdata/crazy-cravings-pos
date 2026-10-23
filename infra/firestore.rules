@@ -34,7 +34,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['vanId', 'type', 'payload', 'createdAt'])
         && d.keys().hasAll(['vanId', 'type', 'payload', 'createdAt'])
         && d.vanId == vanId
-        && d.type in ['shift.opened', 'shift.closed', 'sale.created', 'cash.moved', 'inventory.moved']
+        && d.type in ['shift.opened', 'shift.closed', 'sale.created', 'cash.moved', 'inventory.moved', 'location.recorded']
         && d.createdAt is number
         && d.payload is map;
     }

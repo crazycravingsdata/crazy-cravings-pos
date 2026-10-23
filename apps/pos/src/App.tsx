@@ -6,6 +6,7 @@ import { BlockedScreen } from './features/auth/BlockedScreen';
 import { LoginScreen } from './features/auth/LoginScreen';
 import { SaleScreen } from './features/sale/SaleScreen';
 import { OpenShiftScreen } from './features/shift/OpenShiftScreen';
+import { useLocationTracking } from './features/tracking/useLocationTracking';
 import { loadFirebase, type FirebaseServices } from './firebase';
 import { db } from './state/db';
 import { useSession } from './state/session';
@@ -40,6 +41,11 @@ export function AppView({ firebase }: { firebase: FirebaseServices | undefined }
   // Só sincroniza com conta logada. Em modo local, fica desligado.
   const { status, pending } = useSyncEngine(signedIn ? firebase?.sender : undefined);
   useDriverSync(firebase?.fetchDrivers, signedIn !== undefined);
+  // GPS só com conta logada: assim os pontos têm para onde ir (modo local não sincroniza).
+  const gps = useLocationTracking(
+    session?.shift?.id,
+    signedIn !== undefined && import.meta.env.VITE_TRACKING !== 'false',
+  );
   const drivers = useLiveQuery(() => db.drivers.toArray(), [], []);
 
   useEffect(() => {
@@ -97,5 +103,5 @@ export function AppView({ firebase }: { firebase: FirebaseServices | undefined }
     );
   }
 
-  return <SaleScreen shift={session.shift} syncStatus={status} />;
+  return <SaleScreen shift={session.shift} syncStatus={status} gpsStatus={gps} />;
 }
